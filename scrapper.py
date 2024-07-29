@@ -1,3 +1,7 @@
+'''
+We only use this to populate out steam_workshop_mods_file with data
+'''
+
 import requests
 from bs4 import BeautifulSoup
 import json
