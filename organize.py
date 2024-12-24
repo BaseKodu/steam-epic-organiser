@@ -4,65 +4,76 @@ import json
 from config import STEAM_CONTENT_PATH, EPIC_GAMES_MODS_PATH
 from helpers import path_exists, get_abs_path, copytree_with_skip
 
-# Define paths
-steam_content_path = get_abs_path(STEAM_CONTENT_PATH)
-epic_games_mods_path = get_abs_path(EPIC_GAMES_MODS_PATH)
-#epic_games_assets_path = 'path/to/your/epic/games/Assets'
-#epic_games_maps_path = 'path/to/your/epic/games/Maps'
-
-# Debug: Print paths to ensure they are correct
-print(f"Steam content path: {steam_content_path}")
-#print(f"Epic Games mods path: {epic_games_mods_path}")
-
-'''
-if path_exists(steam_content_path):
-    print("Steam content path exists")
-else:
-    print("Steam content path does not exist")
+def detect_content_type(folder_path):
+    """
+    Detect if a folder contains a mod, asset, or map by checking its contents.
+    Returns 'mod', 'asset', or 'map' accordingly.
+    """
+    # List all files in the directory
+    files = os.listdir(folder_path)
     
-if path_exists(epic_games_mods_path):
-    print("Epic Games mods path exists")
-else:
-    print("Epic Games mods path does not exist")
-'''
+    # Look for common indicators
+    for file in files:
+        lower_file = file.lower()
+        if lower_file.endswith('.dll') or 'modinfo.xml' in lower_file:
+            return 'mod'
+        elif lower_file.endswith('.crp'):
+            return 'map'
+        elif lower_file.endswith('.asset'):
+            return 'asset'
+    
+    # Default to mod if unable to determine
+    return 'mod'
 
-
-# TODO: Make sure you copy entire mod folders, not just the contents
-# Load JSON file with mod information
-with open('steam_workshop_mods.json', 'r') as f:
-    data = json.load(f)
-
-# Function to organize content
 def organize_content():
+    """
+    Organize content from Steam Workshop to Epic Games folders.
+    Copies entire folders based on their content type.
+    """
+    # Load JSON file with mod information
+    with open('steam_workshop_mods.json', 'r') as f:
+        data = json.load(f)
+
+    # Get absolute paths
+    steam_content_path = get_abs_path(STEAM_CONTENT_PATH)
+    epic_games_mods_path = get_abs_path(EPIC_GAMES_MODS_PATH)
+    
+    # Create Epic Games directories if they don't exist
+    os.makedirs(epic_games_mods_path, exist_ok=True)
+    
     # Iterate through directories in the Steam content folder
     for item in os.listdir(steam_content_path):
-        item_path = os.path.join(steam_content_path, item)
+        source_path = os.path.join(steam_content_path, item)
         
-        if os.path.isdir(item_path) and item in data['mods']:
-            mod_info = data['mods'][item]
+        # Skip if not a directory
+        if not os.path.isdir(source_path):
+            continue
             
-            # Determine destination path based on the type
-            destination_path = epic_games_mods_path  # Default to mods path
+        # Skip if not in our JSON data
+        if item not in data['mods']:
+            print(f"Skipping {item} - not found in JSON data")
+            continue
             
-            # Copy the directory to the corresponding folder in the Epic Games version
-            copytree_with_skip(item_path, destination_path)
-            print(f"Copied {item} ({mod_info['name']}) to {destination_path}")
+        # Detect content type
+        content_type = detect_content_type(source_path)
+        
+        # Determine destination path based on content type
+        if content_type == 'mod':
+            destination_base = epic_games_mods_path
         else:
-            # Handle files if necessary
-            print(f"Item {item} not found in JSON data or is not a directory")
-            pass
+            print(f"Skipping {item} - unsupported content type: {content_type}")
+            continue
         
- 
+        # Create the destination folder path
+        destination_path = os.path.join(destination_base, item)
+        
+        # Copy the entire folder
+        if not os.path.exists(destination_path):
+            print(f"Copying {item} ({data['mods'][item]['name']}) to {destination_path}")
+            shutil.copytree(source_path, destination_path)
+        else:
+            print(f"Skipping {item} - already exists in destination")
 
-
-       
 if __name__ == "__main__":
-    ...
     organize_content()
-
-
-
-
-
-
-
+    print("Finished copying content.")
